@@ -21,7 +21,6 @@ public class CustomerService {
         this.client = client;
     }
 
-    // Register customer with hashed password
     public Future<Void> registerCustomer(Customer customer, String plainPassword) {
         Promise<Void> promise = Promise.promise();
 
@@ -30,7 +29,8 @@ public class CustomerService {
         String sql = "INSERT INTO customers (name, email, phone, address, password, portal_access) VALUES ($1, $2, $3, $4, $5, $6)";
 
         client.preparedQuery(sql).execute(
-            Tuple.of(customer.getName(), customer.getEmail(), customer.getPhone(), customer.getAddress(), bcryptHash, customer.getPortalAccess()),
+            Tuple.of(customer.getName(), customer.getEmail(), customer.getPhone(),
+                   customer.getAddress(), bcryptHash, customer.getPortalAccess()),
             ar -> {
                 if (ar.succeeded()) {
                     promise.complete();
@@ -42,7 +42,6 @@ public class CustomerService {
         return promise.future();
     }
 
-    // Get all customers (no password hash sent)
     public Future<List<Customer>> getAllCustomers() {
         Promise<List<Customer>> promise = Promise.promise();
 
@@ -68,14 +67,15 @@ public class CustomerService {
         return promise.future();
     }
 
-    // Update customer (without password update here)
     public Future<Void> updateCustomer(Customer customer) {
         Promise<Void> promise = Promise.promise();
 
-String sql = "INSERT INTO customers (name, email, phone, address, password, portal_access) VALUES ($1, $2, $3, $4, $5, $6)";
+        String sql = "UPDATE customers SET name = $1, email = $2, phone = $3, " +
+                     "address = $4, portal_access = $5 WHERE id = $6";
 
         client.preparedQuery(sql).execute(
-            Tuple.of(customer.getName(), customer.getEmail(), customer.getPhone(), customer.getAddress(), customer.getPortalAccess(), customer.getId()),
+            Tuple.of(customer.getName(), customer.getEmail(), customer.getPhone(),
+                   customer.getAddress(), customer.getPortalAccess(), customer.getId()),
             ar -> {
                 if (ar.succeeded()) {
                     promise.complete();
@@ -87,7 +87,6 @@ String sql = "INSERT INTO customers (name, email, phone, address, password, port
         return promise.future();
     }
 
-    // Delete customer
     public Future<Void> deleteCustomer(int id) {
         Promise<Void> promise = Promise.promise();
 
@@ -102,7 +101,6 @@ String sql = "INSERT INTO customers (name, email, phone, address, password, port
         return promise.future();
     }
 
-    // Customer login
     public Future<Customer> login(String email, String password) {
         Promise<Customer> promise = Promise.promise();
 
@@ -115,7 +113,7 @@ String sql = "INSERT INTO customers (name, email, phone, address, password, port
                     return;
                 }
                 Row row = ar.result().iterator().next();
-                String storedHash = row.getString("password_hash");
+                String storedHash = row.getString("password");
 
                 if (BCrypt.checkpw(password, storedHash)) {
                     Customer c = new Customer();
