@@ -26,7 +26,7 @@ public class UserController {
         router.get("/api/users/search").handler(this::handleSearchUsers);
         router.get("/api/users/:id").handler(this::handleGetUserById);
         router.post("/api/users").handler(this::handleCreateUser);
-        router.put("/api/users/:id/role").handler(this::handleUpdateUserRole);
+       // router.put("/api/users/:id/role").handler(this::handleUpdateUserRole);
         router.put("/api/users/:id").handler(this::handleUpdateUser);
         router.delete("/api/users/:id").handler(this::handleDeleteUser);
     }
