@@ -9,6 +9,7 @@ import com.example.controller.RoleController;
 import com.example.controller.UserController;
 import com.example.service.AuthService;
 import com.example.service.CustomerService;
+import com.example.service.RoleService;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
@@ -50,21 +51,22 @@ public class MainVerticle extends AbstractVerticle {
       ctx.response().setStatusCode(204).end();
     });
 
-    // Mount auth routes
+    // Create services
     AuthService authService = new AuthService(client);
-    new AuthController(vertx, router, authService);
+    RoleService roleService = new RoleService();
+    CustomerService customerService = new CustomerService(client);
+
+    // Mount auth routes (updated constructor)
+    new AuthController(vertx, router, authService, roleService);
 
     // Mount customer routes
-    CustomerService customerService = new CustomerService(client);
     CustomerController customerController = new CustomerController(vertx, customerService);
-
-    // Mount customerController routes under /api path
     router.mountSubRouter("/api", customerController.getRouter());
 
     // Mount role routes
     new RoleController(vertx, router);
 
-    // Mount user routes properly
+    // Mount user routes
     UserController userController = new UserController(client);
     userController.mountRoutes(router);
 
