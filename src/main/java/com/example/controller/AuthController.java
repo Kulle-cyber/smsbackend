@@ -26,8 +26,11 @@ public class AuthController {
         String username = body.getString("username");
         String password = body.getString("password");
 
+        System.out.println("Login attempt for username: " + username);
+
         // ✅ Hardcoded admin
         if ("kulani".equals(username) && "123".equals(password)) {
+            System.out.println("Hardcoded admin login successful.");
             JsonObject response = new JsonObject()
                 .put("message", "Admin login successful")
                 .put("username", "kulani")
@@ -41,12 +44,23 @@ public class AuthController {
 
         // ✅ Existing DB user logic
         authService.getUserByUsername(username).onSuccess(user -> {
-            if (user == null || !authService.checkPassword(password, user.getPasswordHash())) {
+            if (user == null) {
+                System.out.println("User not found for username: " + username);
+                ctx.response().setStatusCode(401).end("Invalid credentials");
+                return;
+            }
+
+            System.out.println("User found: " + user.getUsername());
+            System.out.println("Stored hash: '" + user.getPasswordHash() + "'");
+            boolean passwordMatches = authService.checkPassword(password, user.getPasswordHash());
+            System.out.println("Password matches? " + passwordMatches);
+
+            if (!passwordMatches) {
                 ctx.response().setStatusCode(401).end("Invalid credentials");
             } else {
                 int roleId = user.getRoleId();
 
-                // ✅ Just this part added
+                // ✅ Fetch role name from RoleService
                 roleService.getRoles().onSuccess(roles -> {
                     String roleName = roles.stream()
                         .filter(role -> role.getInteger("id") == roleId)

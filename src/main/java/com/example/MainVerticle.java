@@ -5,14 +5,17 @@ import java.util.Set;
 import com.example.config.DatabaseConfig;
 import com.example.controller.AuthController;
 import com.example.controller.CustomerController;
+import com.example.controller.ProductController;
 import com.example.controller.RoleController;
 import com.example.controller.UserController;
 import com.example.service.AuthService;
 import com.example.service.CustomerService;
+import com.example.service.ProductService;
 import com.example.service.RoleService;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
+import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.CorsHandler;
@@ -22,10 +25,7 @@ public class MainVerticle extends AbstractVerticle {
 
   @Override
   public void start(Promise<Void> startPromise) {
-    // Initialize database client
     PgPool client = DatabaseConfig.getPgClient(vertx);
-
-    // Create main router
     Router router = Router.router(vertx);
 
     // Global CORS handler
@@ -47,30 +47,29 @@ public class MainVerticle extends AbstractVerticle {
     );
 
     // Pre-flight OPTIONS request handler
-    router.options().handler(ctx -> {
-      ctx.response().setStatusCode(204).end();
-    });
+    router.options().handler(ctx -> ctx.response().setStatusCode(204).end());
 
-    // Create services
+    // Initialize services
     AuthService authService = new AuthService(client);
     RoleService roleService = new RoleService();
     CustomerService customerService = new CustomerService(client);
+    ProductService productService = new ProductService(client);
 
-    // Mount auth routes (updated constructor)
+    // Mount other controllers (auth, customer, roles, users) as needed
     new AuthController(vertx, router, authService, roleService);
 
-    // Mount customer routes
     CustomerController customerController = new CustomerController(vertx, customerService);
     router.mountSubRouter("/api", customerController.getRouter());
 
-    // Mount role routes
     new RoleController(vertx, router);
 
-    // Mount user routes
     UserController userController = new UserController(client);
     userController.mountRoutes(router);
 
-    // Start HTTP server
+    // ** Mount Product routes under /api **
+    ProductController productController = new ProductController(vertx, productService);
+    router.mountSubRouter("/api", productController.getRouter());
+
     vertx.createHttpServer()
       .requestHandler(router)
       .listen(8889)
@@ -78,9 +77,6 @@ public class MainVerticle extends AbstractVerticle {
         System.out.println("✅ Server running at http://localhost:8889");
         startPromise.complete();
       })
-      .onFailure(err -> {
-        err.printStackTrace();
-        startPromise.fail(err);
-      });
+      .onFailure(startPromise::fail);
   }
 }
