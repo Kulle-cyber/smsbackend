@@ -2,6 +2,7 @@ package com.example.controller;
 
 import com.example.service.AuthService;
 import com.example.service.RoleService;
+import com.example.util.JwtUtil;
 
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
@@ -11,9 +12,9 @@ import io.vertx.ext.web.handler.BodyHandler;
 
 public class AuthController {
     private final AuthService authService;
-    private final RoleService roleService; // ✅ Add this
+    private final RoleService roleService;
 
-    public AuthController(Vertx vertx, Router router, AuthService authService, RoleService roleService) { // ✅ Add RoleService param
+    public AuthController(Vertx vertx, Router router, AuthService authService, RoleService roleService) {
         this.authService = authService;
         this.roleService = roleService;
 
@@ -28,13 +29,16 @@ public class AuthController {
 
         System.out.println("Login attempt for username: " + username);
 
-        // ✅ Hardcoded admin
+        // Hardcoded admin login
         if ("kulani".equals(username) && "123".equals(password)) {
             System.out.println("Hardcoded admin login successful.");
+            String token = JwtUtil.generateToken(0, "kulani", "admin");
+
             JsonObject response = new JsonObject()
                 .put("message", "Admin login successful")
                 .put("username", "kulani")
-                .put("role", "admin");
+                .put("role", "admin")
+                .put("token", token);
 
             ctx.response()
                .putHeader("Content-Type", "application/json")
@@ -42,7 +46,7 @@ public class AuthController {
             return;
         }
 
-        // ✅ Existing DB user logic
+        // Database user login
         authService.getUserByUsername(username).onSuccess(user -> {
             if (user == null) {
                 System.out.println("User not found for username: " + username);
@@ -60,7 +64,6 @@ public class AuthController {
             } else {
                 int roleId = user.getRoleId();
 
-                // ✅ Fetch role name from RoleService
                 roleService.getRoles().onSuccess(roles -> {
                     String roleName = roles.stream()
                         .filter(role -> role.getInteger("id") == roleId)
@@ -68,10 +71,13 @@ public class AuthController {
                         .findFirst()
                         .orElse("unknown");
 
+                    String token = JwtUtil.generateToken(user.getId(), user.getUsername(), roleName);
+
                     JsonObject response = new JsonObject()
                         .put("message", "Login successful")
                         .put("username", user.getUsername())
-                        .put("role", roleName); // ✅ Use role name
+                        .put("role", roleName)
+                        .put("token", token);
 
                     ctx.response()
                        .putHeader("Content-Type", "application/json")

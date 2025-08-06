@@ -51,7 +51,7 @@
             <version>2.17.1</version>
         </dependency>
 
-        <!-- BCrypt from org.mindrot to fix your import issue -->
+        <!-- BCrypt from org.mindrot -->
         <dependency>
             <groupId>org.mindrot</groupId>
             <artifactId>jbcrypt</artifactId>
@@ -63,6 +63,13 @@
             <groupId>io.vertx</groupId>
             <artifactId>vertx-config</artifactId>
             <version>${vertx.version}</version>
+        </dependency>
+
+        <!-- Auth0 Java JWT -->
+        <dependency>
+            <groupId>com.auth0</groupId>
+            <artifactId>java-jwt</artifactId>
+            <version>4.4.0</version>  <!-- or latest version -->
         </dependency>
     </dependencies>
 

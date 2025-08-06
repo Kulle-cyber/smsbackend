@@ -1,51 +1,39 @@
 package com.example.model;
 
 public class Product {
-    private int id;
+    private Integer id;
     private String name;
     private String description;
-    private double price;
-    private int stock;
+    private Double price;
+    private Integer stock;
     private String imageUrl;
-    private int categoryId;
-    private int salespersonId;
+    private Integer salespersonId; // renamed from sellerId
 
-    public Product() {}
-
-    public Product(int id, String name, String description, double price, int stock, String imageUrl, int categoryId, int salespersonId) {
+    // Constructor
+    public Product(Integer id, String name, String description, Double price, Integer stock, String imageUrl, Integer salespersonId) {
         this.id = id;
         this.name = name;
         this.description = description;
         this.price = price;
         this.stock = stock;
         this.imageUrl = imageUrl;
-        this.categoryId = categoryId;
         this.salespersonId = salespersonId;
     }
 
-    // Getters and setters...
-
-    public int getId() { return id; }
-    public void setId(int id) { this.id = id; }
-
+    // Getters and setters
+    public Integer getId() { return id; }
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-
     public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-
-    public double getPrice() { return price; }
-    public void setPrice(double price) { this.price = price; }
-
-    public int getStock() { return stock; }
-    public void setStock(int stock) { this.stock = stock; }
-
+    public Double getPrice() { return price; }
+    public Integer getStock() { return stock; }
     public String getImageUrl() { return imageUrl; }
+    public Integer getSalespersonId() { return salespersonId; }
+
+    public void setId(Integer id) { this.id = id; }
+    public void setName(String name) { this.name = name; }
+    public void setDescription(String description) { this.description = description; }
+    public void setPrice(Double price) { this.price = price; }
+    public void setStock(Integer stock) { this.stock = stock; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
-
-    public int getCategoryId() { return categoryId; }
-    public void setCategoryId(int categoryId) { this.categoryId = categoryId; }
-
-    public int getSalespersonId() { return salespersonId; }
-    public void setSalespersonId(int salespersonId) { this.salespersonId = salespersonId; }
+    public void setSalespersonId(Integer salespersonId) { this.salespersonId = salespersonId; }
 }

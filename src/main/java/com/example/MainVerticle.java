@@ -66,7 +66,7 @@ public class MainVerticle extends AbstractVerticle {
     UserController userController = new UserController(client);
     userController.mountRoutes(router);
 
-    // ** Mount Product routes under /api **
+    // Mount Product routes under /api
     ProductController productController = new ProductController(vertx, productService);
     router.mountSubRouter("/api", productController.getRouter());
 
