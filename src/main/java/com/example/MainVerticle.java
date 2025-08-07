@@ -15,7 +15,6 @@ import com.example.service.RoleService;
 
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
-import io.vertx.core.Vertx;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.CorsHandler;
@@ -55,20 +54,23 @@ public class MainVerticle extends AbstractVerticle {
     CustomerService customerService = new CustomerService(client);
     ProductService productService = new ProductService(client);
 
-    // Mount other controllers (auth, customer, roles, users) as needed
+    // Auth routes mounted at /api/auth
     new AuthController(vertx, router, authService, roleService);
 
+    // Mount customer routes at /api/customers
     CustomerController customerController = new CustomerController(vertx, customerService);
-    router.mountSubRouter("/api", customerController.getRouter());
+    router.mountSubRouter("/api/customers", customerController.getRouter());
 
+    // Mount role routes at /api/roles
     new RoleController(vertx, router);
 
+    // Mount user routes at /api/users
     UserController userController = new UserController(client);
-    userController.mountRoutes(router);
+    userController.mountRoutes(router); // Make sure UserController mounts on distinct paths
 
-    // Mount Product routes under /api
+    // Mount product routes at /api/products
     ProductController productController = new ProductController(vertx, productService);
-    router.mountSubRouter("/api", productController.getRouter());
+    router.mountSubRouter("/api/products", productController.getRouter());
 
     vertx.createHttpServer()
       .requestHandler(router)

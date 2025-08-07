@@ -15,10 +15,18 @@ public class ProductService {
         this.client = client;
     }
 
-    // GET ALL PRODUCTS
+    // GET ALL PRODUCTS for logged-in salesperson only
     public void getAll(RoutingContext ctx) {
-        client.query("SELECT * FROM products")
-            .execute()
+        Integer salespersonId = ctx.get("userId");
+        if (salespersonId == null) {
+            ctx.response().setStatusCode(401).end("Unauthorized: Salesperson ID missing");
+            return;
+        }
+
+        String query = "SELECT * FROM products WHERE salesperson_id = $1";
+
+        client.preparedQuery(query)
+            .execute(Tuple.of(salespersonId))
             .onSuccess(rows -> {
                 ctx.response()
                     .putHeader("Content-Type", "application/json")
@@ -38,9 +46,7 @@ public class ProductService {
         Integer stock = body.getInteger("stock");
         String imageUrl = body.getString("image_url");
 
-        // Get the logged-in salesperson ID from context
-        Integer salespersonId = ctx.get("userId"); // This must be set by JWT handler
-
+        Integer salespersonId = ctx.get("userId");
         if (salespersonId == null) {
             ctx.response().setStatusCode(401).end("Unauthorized: Salesperson ID missing");
             return;
@@ -64,16 +70,22 @@ public class ProductService {
             .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
 
-    // GET PRODUCT BY ID
+    // GET PRODUCT BY ID for logged-in salesperson only
     public void getById(RoutingContext ctx) {
         int id = Integer.parseInt(ctx.pathParam("id"));
-        String query = "SELECT * FROM products WHERE id = $1";
+        Integer salespersonId = ctx.get("userId");
+        if (salespersonId == null) {
+            ctx.response().setStatusCode(401).end("Unauthorized");
+            return;
+        }
+
+        String query = "SELECT * FROM products WHERE id = $1 AND salesperson_id = $2";
 
         client.preparedQuery(query)
-            .execute(Tuple.of(id))
+            .execute(Tuple.of(id, salespersonId))
             .onSuccess(rows -> {
                 if (!rows.iterator().hasNext()) {
-                    ctx.response().setStatusCode(404).end("Product not found");
+                    ctx.response().setStatusCode(404).end("Product not found or not authorized");
                     return;
                 }
                 ctx.response()
@@ -83,39 +95,78 @@ public class ProductService {
             .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
 
-    // UPDATE PRODUCT
+    // UPDATE PRODUCT for logged-in salesperson only
     public void update(RoutingContext ctx) {
         int id = Integer.parseInt(ctx.pathParam("id"));
         JsonObject body = ctx.body().asJsonObject();
 
-        String query = "UPDATE products SET name=$1, description=$2, price=$3, stock=$4, image_url=$5 WHERE id=$6";
+        Integer salespersonId = ctx.get("userId");
+        if (salespersonId == null) {
+            ctx.response().setStatusCode(401).end("Unauthorized");
+            return;
+        }
 
-        client.preparedQuery(query)
-            .execute(Tuple.of(
-                body.getString("name"),
-                body.getString("description"),
-                body.getDouble("price"),
-                body.getInteger("stock"),
-                body.getString("image_url"),
-                id
-            ))
-            .onSuccess(rows -> {
-                ctx.response()
-                    .putHeader("Content-Type", "application/json")
-                    .end(body.put("id", id).encode());
+        // Check ownership first
+        String checkQuery = "SELECT 1 FROM products WHERE id = $1 AND salesperson_id = $2";
+
+        client.preparedQuery(checkQuery)
+            .execute(Tuple.of(id, salespersonId))
+            .onSuccess(checkRows -> {
+                if (!checkRows.iterator().hasNext()) {
+                    ctx.response().setStatusCode(403).end("Forbidden: You do not own this product");
+                    return;
+                }
+
+                String query = "UPDATE products SET name=$1, description=$2, price=$3, stock=$4, image_url=$5 WHERE id=$6";
+
+                client.preparedQuery(query)
+                    .execute(Tuple.of(
+                        body.getString("name"),
+                        body.getString("description"),
+                        body.getDouble("price"),
+                        body.getInteger("stock"),
+                        body.getString("image_url"),
+                        id
+                    ))
+                    .onSuccess(rows -> {
+                        ctx.response()
+                            .putHeader("Content-Type", "application/json")
+                            .end(body.put("id", id).encode());
+                    })
+                    .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
             })
             .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
 
-    // DELETE PRODUCT
+    // DELETE PRODUCT for logged-in salesperson only
     public void delete(RoutingContext ctx) {
         int id = Integer.parseInt(ctx.pathParam("id"));
-        String query = "DELETE FROM products WHERE id = $1";
 
-        client.preparedQuery(query)
-            .execute(Tuple.of(id))
-            .onSuccess(rows -> {
-                ctx.response().setStatusCode(204).end();
+        Integer salespersonId = ctx.get("userId");
+        if (salespersonId == null) {
+            ctx.response().setStatusCode(401).end("Unauthorized");
+            return;
+        }
+
+        // Check ownership first
+        String checkQuery = "SELECT 1 FROM products WHERE id = $1 AND salesperson_id = $2";
+
+        client.preparedQuery(checkQuery)
+            .execute(Tuple.of(id, salespersonId))
+            .onSuccess(checkRows -> {
+                if (!checkRows.iterator().hasNext()) {
+                    ctx.response().setStatusCode(403).end("Forbidden: You do not own this product");
+                    return;
+                }
+
+                String query = "DELETE FROM products WHERE id = $1";
+
+                client.preparedQuery(query)
+                    .execute(Tuple.of(id))
+                    .onSuccess(rows -> {
+                        ctx.response().setStatusCode(204).end();
+                    })
+                    .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
             })
             .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
