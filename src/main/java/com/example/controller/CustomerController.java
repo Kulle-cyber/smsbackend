@@ -17,13 +17,15 @@ public class CustomerController {
         this.customerService = customerService;
         this.router = Router.router(vertx);
 
+        // Body handler for parsing JSON bodies
         router.route().handler(BodyHandler.create());
 
-        router.post("/customers").handler(this::handleRegister);
-        router.get("/customers").handler(this::handleGetAll);
-        router.put("/customers/:id").handler(this::handleUpdate);
-        router.delete("/customers/:id").handler(this::handleDelete);
-        router.post("/customers/login").handler(this::handleLogin);
+        // Corrected routes — no "/customers" prefix because this router is mounted at "/api/customers"
+        router.post("/").handler(this::handleRegister);
+        router.get("/").handler(this::handleGetAll);
+        router.put("/:id").handler(this::handleUpdate);
+        router.delete("/:id").handler(this::handleDelete);
+        router.post("/login").handler(this::handleLogin);
     }
 
     public Router getRouter() {

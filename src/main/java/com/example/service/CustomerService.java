@@ -1,136 +1,136 @@
 package com.example.service;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.mindrot.jbcrypt.BCrypt;
 
 import com.example.model.Customer;
 
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+import io.vertx.pgclient.PgPool;
 import io.vertx.sqlclient.Row;
-import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
 
 public class CustomerService {
+    private final PgPool client;
 
-    private final SqlClient client;
-
-    public CustomerService(SqlClient client) {
+    public CustomerService(PgPool client) {
         this.client = client;
     }
 
+    // ✅ Register customer
     public Future<Void> registerCustomer(Customer customer, String plainPassword) {
         Promise<Void> promise = Promise.promise();
+        String hashedPassword = BCrypt.hashpw(plainPassword, BCrypt.gensalt());
 
-        String bcryptHash = BCrypt.hashpw(plainPassword, BCrypt.gensalt(12));
-
-        String sql = "INSERT INTO customers (name, email, phone, address, password, portal_access) VALUES ($1, $2, $3, $4, $5, $6)";
-
-        client.preparedQuery(sql).execute(
-            Tuple.of(customer.getName(), customer.getEmail(), customer.getPhone(),
-                   customer.getAddress(), bcryptHash, customer.getPortalAccess()),
-            ar -> {
-                if (ar.succeeded()) {
-                    promise.complete();
-                } else {
-                    promise.fail(ar.cause());
-                }
-            });
-
-        return promise.future();
-    }
-
-    public Future<List<Customer>> getAllCustomers() {
-        Promise<List<Customer>> promise = Promise.promise();
-
-        client.query("SELECT id, name, email, phone, address, portal_access FROM customers").execute(ar -> {
-            if (ar.succeeded()) {
-                List<Customer> list = new ArrayList<>();
-                for (Row row : ar.result()) {
-                    Customer c = new Customer();
-                    c.setId(row.getInteger("id"));
-                    c.setName(row.getString("name"));
-                    c.setEmail(row.getString("email"));
-                    c.setPhone(row.getString("phone"));
-                    c.setAddress(row.getString("address"));
-                    c.setPortalAccess(row.getBoolean("portal_access"));
-                    list.add(c);
-                }
-                promise.complete(list);
-            } else {
-                promise.fail(ar.cause());
-            }
-        });
+        String query = "INSERT INTO customers (name, email, phone, address, portal_access, password) VALUES ($1, $2, $3, $4, $5, $6)";
+        client.preparedQuery(query)
+                .execute(Tuple.of(
+                        customer.getName(),
+                        customer.getEmail(),
+                        customer.getPhone(),
+                        customer.getAddress(),
+                        customer.getPortalAccess(),
+                        hashedPassword
+                ))
+                .onSuccess(res -> promise.complete())
+                .onFailure(promise::fail);
 
         return promise.future();
     }
 
+    // ✅ Get all customers (excluding password)
+    public Future<JsonArray> getAllCustomers() {
+        Promise<JsonArray> promise = Promise.promise();
+
+        String query = "SELECT id, name, email, phone, address, portal_access FROM customers";
+        client.query(query)
+                .execute()
+                .onSuccess(rows -> {
+                    JsonArray customers = new JsonArray();
+                    for (Row row : rows) {
+                        JsonObject json = new JsonObject()
+                                .put("id", row.getInteger("id"))
+                                .put("name", row.getString("name"))
+                                .put("email", row.getString("email"))
+                                .put("phone", row.getString("phone"))
+                                .put("address", row.getString("address"))
+                                .put("portalAccess", row.getBoolean("portal_access"));
+                        customers.add(json);
+                    }
+                    promise.complete(customers);
+                })
+                .onFailure(promise::fail);
+
+        return promise.future();
+    }
+
+    // ✅ Update customer
     public Future<Void> updateCustomer(Customer customer) {
         Promise<Void> promise = Promise.promise();
 
-        String sql = "UPDATE customers SET name = $1, email = $2, phone = $3, " +
-                     "address = $4, portal_access = $5 WHERE id = $6";
-
-        client.preparedQuery(sql).execute(
-            Tuple.of(customer.getName(), customer.getEmail(), customer.getPhone(),
-                   customer.getAddress(), customer.getPortalAccess(), customer.getId()),
-            ar -> {
-                if (ar.succeeded()) {
-                    promise.complete();
-                } else {
-                    promise.fail(ar.cause());
-                }
-            });
+        String query = "UPDATE customers SET name = $1, email = $2, phone = $3, address = $4, portal_access = $5 WHERE id = $6";
+        client.preparedQuery(query)
+                .execute(Tuple.of(
+                        customer.getName(),
+                        customer.getEmail(),
+                        customer.getPhone(),
+                        customer.getAddress(),
+                        customer.getPortalAccess(),
+                        customer.getId()
+                ))
+                .onSuccess(res -> promise.complete())
+                .onFailure(promise::fail);
 
         return promise.future();
     }
 
+    // ✅ Delete customer
     public Future<Void> deleteCustomer(int id) {
         Promise<Void> promise = Promise.promise();
 
-        client.preparedQuery("DELETE FROM customers WHERE id = $1").execute(Tuple.of(id), ar -> {
-            if (ar.succeeded()) {
-                promise.complete();
-            } else {
-                promise.fail(ar.cause());
-            }
-        });
+        String query = "DELETE FROM customers WHERE id = $1";
+        client.preparedQuery(query)
+                .execute(Tuple.of(id))
+                .onSuccess(res -> promise.complete())
+                .onFailure(promise::fail);
 
         return promise.future();
     }
 
-    public Future<Customer> login(String email, String password) {
-        Promise<Customer> promise = Promise.promise();
+    // ✅ Login
+    public Future<JsonObject> login(String email, String plainPassword) {
+        Promise<JsonObject> promise = Promise.promise();
 
-        String sql = "SELECT * FROM customers WHERE email = $1 AND portal_access = TRUE";
+        String query = "SELECT * FROM customers WHERE email = $1";
+        client.preparedQuery(query)
+                .execute(Tuple.of(email))
+                .onSuccess(rows -> {
+                    if (!rows.iterator().hasNext()) {
+                        promise.fail("Invalid email or password");
+                        return;
+                    }
 
-        client.preparedQuery(sql).execute(Tuple.of(email), ar -> {
-            if (ar.succeeded()) {
-                if (ar.result().size() == 0) {
-                    promise.fail("User not found or no portal access");
-                    return;
-                }
-                Row row = ar.result().iterator().next();
-                String storedHash = row.getString("password");
+                    Row row = rows.iterator().next();
+                    String hashedPassword = row.getString("password");
 
-                if (BCrypt.checkpw(password, storedHash)) {
-                    Customer c = new Customer();
-                    c.setId(row.getInteger("id"));
-                    c.setName(row.getString("name"));
-                    c.setEmail(row.getString("email"));
-                    c.setPhone(row.getString("phone"));
-                    c.setAddress(row.getString("address"));
-                    c.setPortalAccess(row.getBoolean("portal_access"));
-                    promise.complete(c);
-                } else {
-                    promise.fail("Invalid password");
-                }
-            } else {
-                promise.fail(ar.cause());
-            }
-        });
+                    if (!BCrypt.checkpw(plainPassword, hashedPassword)) {
+                        promise.fail("Invalid email or password");
+                        return;
+                    }
+
+                    JsonObject customer = new JsonObject()
+                            .put("id", row.getInteger("id"))
+                            .put("name", row.getString("name"))
+                            .put("email", row.getString("email"))
+                            .put("phone", row.getString("phone"))
+                            .put("address", row.getString("address"))
+                            .put("portalAccess", row.getBoolean("portal_access"));
+
+                    promise.complete(customer);
+                })
+                .onFailure(promise::fail);
 
         return promise.future();
     }

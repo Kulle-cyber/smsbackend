@@ -30,7 +30,7 @@ public class ProductService {
             .onSuccess(rows -> {
                 ctx.response()
                     .putHeader("Content-Type", "application/json")
-                    .end(JsonArrayFromRows(rows).encode());
+                    .end(jsonArrayFromRows(rows).encode());
             })
             .onFailure(err -> {
                 ctx.response().setStatusCode(500).end(err.getMessage());
@@ -44,7 +44,7 @@ public class ProductService {
         String description = body.getString("description");
         Double price = body.getDouble("price");
         Integer stock = body.getInteger("stock");
-        String imageUrl = body.getString("image_url");
+        String image_url = body.getString("image_url");
 
         Integer salespersonId = ctx.get("userId");
         if (salespersonId == null) {
@@ -56,7 +56,7 @@ public class ProductService {
                        "VALUES ($1, $2, $3, $4, $5, $6) RETURNING id";
 
         client.preparedQuery(query)
-            .execute(Tuple.of(name, description, price, stock, imageUrl, salespersonId))
+            .execute(Tuple.of(name, description, price, stock, image_url, salespersonId))
             .onSuccess(rows -> {
                 int id = rows.iterator().next().getInteger("id");
                 body.put("id", id);
@@ -172,7 +172,7 @@ public class ProductService {
     }
 
     // Helper: Convert RowSet to JsonArray
-    private JsonArray JsonArrayFromRows(RowSet<Row> rows) {
+    private JsonArray jsonArrayFromRows(RowSet<Row> rows) {
         JsonArray array = new JsonArray();
         for (Row row : rows) {
             array.add(row.toJson());
