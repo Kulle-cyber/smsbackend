@@ -2,9 +2,11 @@ package com.example.service;
 
 import org.mindrot.jbcrypt.BCrypt;
 
+import com.example.model.Customer;
 import com.example.model.User;
 
 import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.pgclient.PgPool;
 import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.Tuple;
@@ -50,5 +52,28 @@ public class AuthService {
             System.err.println("Invalid bcrypt hash format: " + e.getMessage());
             return false;
         }
+    }
+
+    // NEW: Get customer by email
+    public Future<Customer> getCustomerByEmail(String email) {
+        Promise<Customer> promise = Promise.promise();
+        client.preparedQuery("SELECT id, name, email, phone, address, portal_access, password FROM customers WHERE email = $1")
+            .execute(Tuple.of(email), ar -> {
+                if (ar.succeeded() && ar.result().size() > 0) {
+                    Row row = ar.result().iterator().next();
+                    Customer customer = new Customer();
+                    customer.setId(row.getInteger("id"));
+                    customer.setName(row.getString("name"));
+                    customer.setEmail(row.getString("email"));
+                    customer.setPhone(row.getString("phone"));
+                    customer.setAddress(row.getString("address"));
+                    customer.setPortalAccess(row.getBoolean("portal_access"));
+                    customer.setPassword(row.getString("password")); // store hash in password field
+                    promise.complete(customer);
+                } else {
+                    promise.complete(null);
+                }
+            });
+        return promise.future();
     }
 }

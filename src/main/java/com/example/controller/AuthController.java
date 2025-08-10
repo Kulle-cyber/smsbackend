@@ -27,7 +27,7 @@ public class AuthController {
         String username = body.getString("username");
         String password = body.getString("password");
 
-        System.out.println("Login attempt for username: " + username);
+        System.out.println("Login attempt for username/email: " + username);
 
         // Hardcoded admin login
         if ("kulani".equals(username) && "123".equals(password)) {
@@ -46,24 +46,17 @@ public class AuthController {
             return;
         }
 
-        // Database user login
+        // First: check system users
         authService.getUserByUsername(username).onSuccess(user -> {
-            if (user == null) {
-                System.out.println("User not found for username: " + username);
-                ctx.response().setStatusCode(401).end("Invalid credentials");
-                return;
-            }
+            if (user != null) {
+                System.out.println("User found: " + user.getUsername());
+                boolean passwordMatches = authService.checkPassword(password, user.getPasswordHash());
+                if (!passwordMatches) {
+                    ctx.response().setStatusCode(401).end("Invalid credentials");
+                    return;
+                }
 
-            System.out.println("User found: " + user.getUsername());
-            System.out.println("Stored hash: '" + user.getPasswordHash() + "'");
-            boolean passwordMatches = authService.checkPassword(password, user.getPasswordHash());
-            System.out.println("Password matches? " + passwordMatches);
-
-            if (!passwordMatches) {
-                ctx.response().setStatusCode(401).end("Invalid credentials");
-            } else {
                 int roleId = user.getRoleId();
-
                 roleService.getRoles().onSuccess(roles -> {
                     String roleName = roles.stream()
                         .filter(role -> role.getInteger("id") == roleId)
@@ -82,10 +75,38 @@ public class AuthController {
                     ctx.response()
                        .putHeader("Content-Type", "application/json")
                        .end(response.encode());
-                }).onFailure(err -> {
-                    ctx.response().setStatusCode(500).end("Failed to load role");
-                });
+                }).onFailure(err -> ctx.response().setStatusCode(500).end("Failed to load role"));
+                return;
             }
+
+            // Second: check customers by email
+            authService.getCustomerByEmail(username).onSuccess(customer -> {
+                if (customer == null) {
+                    ctx.response().setStatusCode(401).end("Invalid credentials");
+                    return;
+                }
+
+                boolean passwordMatches = authService.checkPassword(password, customer.getPassword());
+                if (!passwordMatches) {
+                    ctx.response().setStatusCode(401).end("Invalid credentials");
+                    return;
+                }
+
+                String token = JwtUtil.generateToken(customer.getId(), customer.getEmail(), "customer");
+
+                JsonObject response = new JsonObject()
+                    .put("message", "Customer login successful")
+                    .put("username", customer.getEmail())
+                    .put("role", "customer")
+                    .put("token", token);
+
+                ctx.response()
+                   .putHeader("Content-Type", "application/json")
+                   .end(response.encode());
+            }).onFailure(err -> {
+                ctx.response().setStatusCode(500).end("Login failed: " + err.getMessage());
+            });
+
         }).onFailure(err -> {
             ctx.response().setStatusCode(500).end("Login failed: " + err.getMessage());
         });
