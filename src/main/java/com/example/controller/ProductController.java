@@ -15,10 +15,13 @@ public class ProductController {
         // BodyHandler for POST/PUT to parse JSON body
         router.route().handler(io.vertx.ext.web.handler.BodyHandler.create());
 
+        // Add public route BEFORE JWT middleware so it remains public
+router.get("/public").handler(productService::getAllPublic);
+
         // Protect all /products routes with JWT middleware
         router.route().handler(JwtAuthHandler::handle);
 
-        // Define routes relative to /products base path
+        // Define routes relative to /products base path (JWT protected)
         router.get("/").handler(productService::getAll);
         router.post("/").handler(productService::create);
         router.get("/:id").handler(productService::getById);

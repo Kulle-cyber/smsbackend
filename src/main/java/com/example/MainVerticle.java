@@ -24,7 +24,10 @@ public class MainVerticle extends AbstractVerticle {
 
   @Override
   public void start(Promise<Void> startPromise) {
+    // Initialize database connection
     PgPool client = DatabaseConfig.getPgClient(vertx);
+
+    // Main router
     Router router = Router.router(vertx);
 
     // Global CORS handler
@@ -72,6 +75,7 @@ public class MainVerticle extends AbstractVerticle {
     ProductController productController = new ProductController(vertx, productService);
     router.mountSubRouter("/api/products", productController.getRouter());
 
+    // Start HTTP server
     vertx.createHttpServer()
       .requestHandler(router)
       .listen(8889)
