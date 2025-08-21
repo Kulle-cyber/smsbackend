@@ -3,7 +3,6 @@ package com.example.controller;
 import com.example.service.AuthService;
 import com.example.service.RoleService;
 import com.example.util.JwtUtil;
-
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
@@ -11,6 +10,7 @@ import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.handler.BodyHandler;
 
 public class AuthController {
+
     private final AuthService authService;
     private final RoleService roleService;
 
@@ -29,9 +29,8 @@ public class AuthController {
 
         System.out.println("Login attempt for username/email: " + username);
 
-        // Hardcoded admin login
+        // 1️⃣ Hardcoded admin login
         if ("kulani".equals(username) && "123".equals(password)) {
-            System.out.println("Hardcoded admin login successful.");
             String token = JwtUtil.generateToken(0, "kulani", "admin");
 
             JsonObject response = new JsonObject()
@@ -46,20 +45,18 @@ public class AuthController {
             return;
         }
 
-        // First: check system users
+        // 2️⃣ Check system users
         authService.getUserByUsername(username).onSuccess(user -> {
             if (user != null) {
-                System.out.println("User found: " + user.getUsername());
                 boolean passwordMatches = authService.checkPassword(password, user.getPasswordHash());
                 if (!passwordMatches) {
                     ctx.response().setStatusCode(401).end("Invalid credentials");
                     return;
                 }
 
-                int roleId = user.getRoleId();
                 roleService.getRoles().onSuccess(roles -> {
                     String roleName = roles.stream()
-                        .filter(role -> role.getInteger("id") == roleId)
+                        .filter(role -> role.getInteger("id") == user.getRoleId())
                         .map(role -> role.getString("name").toLowerCase())
                         .findFirst()
                         .orElse("unknown");
@@ -67,7 +64,7 @@ public class AuthController {
                     String token = JwtUtil.generateToken(user.getId(), user.getUsername(), roleName);
 
                     JsonObject response = new JsonObject()
-                        .put("message", "Login successful")
+                        .put("message", "User login successful")
                         .put("username", user.getUsername())
                         .put("role", roleName)
                         .put("token", token);
@@ -79,7 +76,7 @@ public class AuthController {
                 return;
             }
 
-            // Second: check customers by email
+            // 3️⃣ Check customer login
             authService.getCustomerByEmail(username).onSuccess(customer -> {
                 if (customer == null) {
                     ctx.response().setStatusCode(401).end("Invalid credentials");
@@ -98,7 +95,8 @@ public class AuthController {
                     .put("message", "Customer login successful")
                     .put("username", customer.getEmail())
                     .put("role", "customer")
-                    .put("token", token);
+                    .put("token", token)
+                    .put("customerId", customer.getId()); // ✅ Important: include customerId
 
                 ctx.response()
                    .putHeader("Content-Type", "application/json")

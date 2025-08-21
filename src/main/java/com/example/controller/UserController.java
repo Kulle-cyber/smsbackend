@@ -26,7 +26,6 @@ public class UserController {
         router.get("/api/users/search").handler(this::handleSearchUsers);
         router.get("/api/users/:id").handler(this::handleGetUserById);
         router.post("/api/users").handler(this::handleCreateUser);
-       // router.put("/api/users/:id/role").handler(this::handleUpdateUserRole);
         router.put("/api/users/:id").handler(this::handleUpdateUser);
         router.delete("/api/users/:id").handler(this::handleDeleteUser);
     }
@@ -38,11 +37,10 @@ public class UserController {
                 .end(Json.encodePrettily(roles)))
             .onFailure(err -> {
                 err.printStackTrace();
-                JsonObject errorJson = new JsonObject().put("error", "Failed to fetch roles");
                 ctx.response()
                     .setStatusCode(500)
                     .putHeader("Content-Type", "application/json")
-                    .end(errorJson.encode());
+                    .end(new JsonObject().put("error", "Failed to fetch roles").encode());
             });
     }
 
@@ -53,11 +51,10 @@ public class UserController {
                 .end(Json.encodePrettily(users)))
             .onFailure(err -> {
                 err.printStackTrace();
-                JsonObject errorJson = new JsonObject().put("error", "Failed to fetch users");
                 ctx.response()
                     .setStatusCode(500)
                     .putHeader("Content-Type", "application/json")
-                    .end(errorJson.encode());
+                    .end(new JsonObject().put("error", "Failed to fetch users").encode());
             });
     }
 
@@ -77,11 +74,10 @@ public class UserController {
                 .end(Json.encodePrettily(users)))
             .onFailure(err -> {
                 err.printStackTrace();
-                JsonObject errorJson = new JsonObject().put("error", "Failed to search users");
                 ctx.response()
                     .setStatusCode(500)
                     .putHeader("Content-Type", "application/json")
-                    .end(errorJson.encode());
+                    .end(new JsonObject().put("error", "Failed to search users").encode());
             });
     }
 
@@ -103,11 +99,10 @@ public class UserController {
                 })
                 .onFailure(err -> {
                     err.printStackTrace();
-                    JsonObject errorJson = new JsonObject().put("error", "Failed to fetch user");
                     ctx.response()
                         .setStatusCode(500)
                         .putHeader("Content-Type", "application/json")
-                        .end(errorJson.encode());
+                        .end(new JsonObject().put("error", "Failed to fetch user").encode());
                 });
         } catch (NumberFormatException e) {
             ctx.response()
@@ -122,7 +117,11 @@ public class UserController {
             JsonObject json = ctx.getBodyAsJson();
             System.out.println("Received create user JSON: " + json.encodePrettily());
 
+            // Map JSON to User
             User user = json.mapTo(User.class);
+
+            // ⚡ Explicitly set password
+            user.setPassword(json.getString("password"));
 
             userService.createUser(user)
                 .onSuccess(res -> ctx.response()
@@ -132,55 +131,21 @@ public class UserController {
                 .onFailure(err -> {
                     err.printStackTrace();
                     String msg = err.getMessage();
+                    int status = 400;
                     if ("Username already exists".equals(msg) || "Email already exists".equals(msg) || "Username or email already exists".equals(msg)) {
-                        JsonObject errorJson = new JsonObject().put("error", msg);
-                        ctx.response()
-                            .setStatusCode(409) // Conflict
-                            .putHeader("Content-Type", "application/json")
-                            .end(errorJson.encode());
-                    } else {
-                        JsonObject errorJson = new JsonObject().put("error", "Failed to create user: " + msg);
-                        ctx.response()
-                            .setStatusCode(400)
-                            .putHeader("Content-Type", "application/json")
-                            .end(errorJson.encode());
+                        status = 409; // Conflict
                     }
+                    ctx.response()
+                        .setStatusCode(status)
+                        .putHeader("Content-Type", "application/json")
+                        .end(new JsonObject().put("error", msg).encode());
                 });
         } catch (Exception e) {
             e.printStackTrace();
-            JsonObject errorJson = new JsonObject().put("error", "Invalid user data");
             ctx.response()
                 .setStatusCode(400)
                 .putHeader("Content-Type", "application/json")
-                .end(errorJson.encode());
-        }
-    }
-
-    private void handleUpdateUserRole(RoutingContext ctx) {
-        try {
-            int userId = Integer.parseInt(ctx.pathParam("id"));
-            JsonObject json = ctx.getBodyAsJson();
-            int roleId = json.getInteger("roleId");
-
-            userService.updateUserRole(userId, roleId)
-                .onSuccess(res -> ctx.response()
-                    .setStatusCode(200)
-                    .putHeader("Content-Type", "application/json")
-                    .end(new JsonObject().put("message", "Role updated successfully").encode()))
-                .onFailure(err -> {
-                    err.printStackTrace();
-                    JsonObject errorJson = new JsonObject().put("error", "Failed to update role: " + err.getMessage());
-                    ctx.response()
-                        .setStatusCode(400)
-                        .putHeader("Content-Type", "application/json")
-                        .end(errorJson.encode());
-                });
-        } catch (Exception e) {
-            JsonObject errorJson = new JsonObject().put("error", "Invalid request data");
-            ctx.response()
-                .setStatusCode(400)
-                .putHeader("Content-Type", "application/json")
-                .end(errorJson.encode());
+                .end(new JsonObject().put("error", "Invalid user data").encode());
         }
     }
 
@@ -191,7 +156,7 @@ public class UserController {
 
             String username = json.getString("username");
             String email = json.getString("email");
-            String password = json.getString("password"); // Optional
+            String password = json.getString("password"); // optional
 
             userService.updateUserDetails(userId, username, email, password)
                 .onSuccess(res -> ctx.response()
@@ -201,33 +166,24 @@ public class UserController {
                 .onFailure(err -> {
                     err.printStackTrace();
                     String msg = err.getMessage();
-                    if ("Username or email already exists".equals(msg)) {
-                        JsonObject errorJson = new JsonObject().put("error", msg);
-                        ctx.response()
-                            .setStatusCode(409) // Conflict
-                            .putHeader("Content-Type", "application/json")
-                            .end(errorJson.encode());
-                    } else {
-                        JsonObject errorJson = new JsonObject().put("error", "Failed to update user: " + msg);
-                        ctx.response()
-                            .setStatusCode(400)
-                            .putHeader("Content-Type", "application/json")
-                            .end(errorJson.encode());
-                    }
+                    int status = "Username or email already exists".equals(msg) ? 409 : 400;
+                    ctx.response()
+                        .setStatusCode(status)
+                        .putHeader("Content-Type", "application/json")
+                        .end(new JsonObject().put("error", msg).encode());
                 });
         } catch (Exception e) {
-            JsonObject errorJson = new JsonObject().put("error", "Invalid request data");
+            e.printStackTrace();
             ctx.response()
                 .setStatusCode(400)
                 .putHeader("Content-Type", "application/json")
-                .end(errorJson.encode());
+                .end(new JsonObject().put("error", "Invalid request data").encode());
         }
     }
 
     private void handleDeleteUser(RoutingContext ctx) {
         try {
             int userId = Integer.parseInt(ctx.pathParam("id"));
-
             userService.deleteUser(userId)
                 .onSuccess(res -> ctx.response()
                     .setStatusCode(200)
@@ -235,11 +191,10 @@ public class UserController {
                     .end(new JsonObject().put("message", "User deleted successfully").encode()))
                 .onFailure(err -> {
                     err.printStackTrace();
-                    JsonObject errorJson = new JsonObject().put("error", "Failed to delete user: " + err.getMessage());
                     ctx.response()
                         .setStatusCode(400)
                         .putHeader("Content-Type", "application/json")
-                        .end(errorJson.encode());
+                        .end(new JsonObject().put("error", "Failed to delete user: " + err.getMessage()).encode());
                 });
         } catch (NumberFormatException e) {
             ctx.response()

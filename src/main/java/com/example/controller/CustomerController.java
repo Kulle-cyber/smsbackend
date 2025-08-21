@@ -17,10 +17,10 @@ public class CustomerController {
         this.customerService = customerService;
         this.router = Router.router(vertx);
 
-        // Body handler for parsing JSON bodies
+        // Parse JSON bodies
         router.route().handler(BodyHandler.create());
 
-        // Corrected routes — no "/customers" prefix because this router is mounted at "/api/customers"
+        // Routes (mounted at /api/customers)
         router.post("/").handler(this::handleRegister);
         router.get("/").handler(this::handleGetAll);
         router.put("/:id").handler(this::handleUpdate);
@@ -32,33 +32,35 @@ public class CustomerController {
         return router;
     }
 
+    // Handle customer registration safely
     private void handleRegister(RoutingContext ctx) {
         var json = ctx.getBodyAsJson();
         Customer c = json.mapTo(Customer.class);
         String plainPassword = json.getString("password");
 
-        if (plainPassword == null || plainPassword.isEmpty()) {
-            ctx.response().setStatusCode(400).end("Password is required");
-            return;
-        }
-
+        // Default portalAccess to false if not provided
         if (c.getPortalAccess() == null) {
             c.setPortalAccess(false);
         }
 
-        customerService.registerCustomer(c, plainPassword).onSuccess(v -> {
-            ctx.response().setStatusCode(201).end("Customer registered");
-        }).onFailure(err -> {
-            ctx.response().setStatusCode(500).end(err.getMessage());
-        });
+        // Require password if portalAccess is true
+        if (c.getPortalAccess() && (plainPassword == null || plainPassword.isEmpty())) {
+            ctx.response().setStatusCode(400).end("Password is required for portal access");
+            return;
+        }
+
+        customerService.registerCustomer(c, plainPassword)
+                .onSuccess(v -> ctx.response().setStatusCode(201).end("Customer registered"))
+                .onFailure(err -> {
+                    err.printStackTrace(); // Logs exact error
+                    ctx.response().setStatusCode(500).end(err.getMessage());
+                });
     }
 
     private void handleGetAll(RoutingContext ctx) {
-        customerService.getAllCustomers().onSuccess(customers -> {
-            ctx.json(customers);
-        }).onFailure(err -> {
-            ctx.response().setStatusCode(500).end(err.getMessage());
-        });
+        customerService.getAllCustomers()
+                .onSuccess(customers -> ctx.json(customers))
+                .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
 
     private void handleUpdate(RoutingContext ctx) {
@@ -74,11 +76,9 @@ public class CustomerController {
         Customer c = json.mapTo(Customer.class);
         c.setId(id);
 
-        customerService.updateCustomer(c).onSuccess(v -> {
-            ctx.response().end("Customer updated");
-        }).onFailure(err -> {
-            ctx.response().setStatusCode(500).end(err.getMessage());
-        });
+        customerService.updateCustomer(c)
+                .onSuccess(v -> ctx.response().setStatusCode(200).end("Customer updated"))
+                .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
 
     private void handleDelete(RoutingContext ctx) {
@@ -90,11 +90,9 @@ public class CustomerController {
             return;
         }
 
-        customerService.deleteCustomer(id).onSuccess(v -> {
-            ctx.response().setStatusCode(204).end();
-        }).onFailure(err -> {
-            ctx.response().setStatusCode(500).end(err.getMessage());
-        });
+        customerService.deleteCustomer(id)
+                .onSuccess(v -> ctx.response().setStatusCode(204).end())
+                .onFailure(err -> ctx.response().setStatusCode(500).end(err.getMessage()));
     }
 
     private void handleLogin(RoutingContext ctx) {
@@ -102,10 +100,8 @@ public class CustomerController {
         String email = json.getString("email");
         String password = json.getString("password");
 
-        customerService.login(email, password).onSuccess(customer -> {
-            ctx.json(customer);
-        }).onFailure(err -> {
-            ctx.response().setStatusCode(401).end(err.getMessage());
-        });
+        customerService.login(email, password)
+                .onSuccess(customer -> ctx.json(customer))
+                .onFailure(err -> ctx.response().setStatusCode(401).end(err.getMessage()));
     }
 }

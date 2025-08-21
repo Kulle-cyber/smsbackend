@@ -1,5 +1,8 @@
-// src/main/java/com/example/model/User.java
 package com.example.model;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import io.vertx.core.json.JsonObject;
 
 public class User {
     private int id;
@@ -8,6 +11,10 @@ public class User {
     private int roleId;
     private String fullName;
     private String email;
+
+    // 🔹 NEW: transient password for incoming JSON
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    private String password;
 
     public User() {}
 
@@ -38,4 +45,18 @@ public class User {
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
+
+    // 🔹 getter/setter for transient password
+    public String getPassword() { return password; }
+    public void setPassword(String password) { this.password = password; }
+
+    // Convert to JsonObject (without passwordHash)
+    public JsonObject toJson() {
+        return new JsonObject()
+            .put("id", this.id)
+            .put("username", this.username)
+            .put("fullName", this.fullName)
+            .put("email", this.email)
+            .put("roleId", this.roleId);
+    }
 }
